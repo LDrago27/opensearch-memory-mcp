@@ -1,0 +1,19 @@
+{
+  "name": "kiro-memory",
+  "description": "Default Kiro agent with automatic OpenSearch memory logging via lifecycle hooks.",
+  "tools": ["*"],
+  "allowedTools": [],
+  "resources": [],
+  "includeMcpJson": true,
+  "hooks": {
+    "userPromptSubmit": [
+      { "command": "python -m opensearch_memory_mcp hook --agent kiro" }
+    ],
+    "postToolUse": [
+      { "matcher": "*", "command": "python -m opensearch_memory_mcp hook --agent kiro" }
+    ],
+    "stop": [
+      { "command": "python -m opensearch_memory_mcp hook --agent kiro" }
+    ]
+  }
+}

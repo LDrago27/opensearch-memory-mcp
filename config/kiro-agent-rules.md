@@ -1,23 +1,26 @@
 # Memory Instructions for Kiro CLI
 
-You have access to the `opensearch-memory` MCP server for persistent memory across sessions.
+The `opensearch-memory` MCP server is registered for Kiro CLI. User prompts,
+tool calls, and assistant replies are persisted automatically by Kiro CLI
+lifecycle hooks (`userPromptSubmit`, `postToolUse`, `stop`) configured on the
+`kiro-memory` agent — you do **not** need to call `save_memory` yourself.
 
-## Auto-save rule
-After EVERY response, call `save_memory` with:
-- `content`: Concise summary of what you did/said
-- `role`: "assistant"
-- `session_id`: Reuse the same session_id for the entire conversation
-- `agent_type`: "kiro"
-- `project`: Current working directory or project name
-- `tags`: Relevant tags
-- `tool_calls`: Any tools called
+These hooks are installed by:
 
-When the user sends a message, save it with `role`: "user".
+```bash
+python -m opensearch_memory_mcp setup kiro
+```
+
+which writes `~/.kiro/agents/kiro-memory.json` and makes it the default agent
+(`kiro-cli agent set-default kiro-memory`). Revert with
+`kiro-cli agent set-default kiro_default`.
 
 ## Recall
+
 Use `recall` to search past context before complex tasks.
-Use `recall_timeframe` for time-based queries.
+Use `recall_timeframe` for time-based queries ("what did I do yesterday?").
 
 ## Analysis
+
 Use `analyze_workflow` when asked to optimize workflow — reason over the returned
 data to suggest new agents, skills, or improvements.

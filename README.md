@@ -52,10 +52,28 @@ pip install -e .
 
 ### 3. Configure your agent
 
+Both integrations save user prompts, tool calls, and assistant replies
+automatically via **lifecycle hooks** — no model cooperation required. Hook
+failures never block the agent: if OpenSearch is unreachable, the hook logs to
+stderr and exits 0.
+
 **Kiro CLI:**
 ```bash
 python -m opensearch_memory_mcp setup kiro
 ```
+
+This:
+1. Registers the `opensearch-memory` MCP server globally in `~/.kiro/settings/mcp.json`.
+2. Writes a memory-enabled agent to `~/.kiro/agents/kiro-memory.json` — a full-toolset agent (`"tools": ["*"]`, `"includeMcpJson": true`) with `userPromptSubmit`, `postToolUse`, and `stop` hooks that call `python -m opensearch_memory_mcp hook --agent kiro`.
+3. Runs `kiro-cli agent set-default kiro-memory` so **every** `kiro-cli chat` auto-logs. Revert anytime with `kiro-cli agent set-default kiro_default`.
+4. Installs slim recall/analyze guidance at `~/.kiro/steering/memory-recall.md` (replacing the older `memory-auto-logging.md`, since saves are no longer prompt-driven).
+
+> **Kiro hooks are per-agent.** Unlike Claude Code, Kiro has no global hooks
+> file, and the built-in `kiro_default` agent can't be edited. Setup therefore
+> attaches logging to the `kiro-memory` agent and makes it the default.
+> Conversations you explicitly start under *another* agent
+> (`kiro-cli chat --agent <other>`) won't log unless you add the same hooks
+> block to that agent's config (see [Manual Kiro hook wiring](#manual-kiro-hook-wiring)).
 
 **Claude Code:**
 ```bash
@@ -63,11 +81,9 @@ python -m opensearch_memory_mcp setup claude-code
 ```
 
 This:
-1. Registers the `opensearch-memory` MCP server with Claude Code.
-2. Installs **lifecycle hooks** in `~/.claude/settings.json` so user prompts, tool calls, and assistant replies are saved automatically — no model cooperation required. Hooks run for `UserPromptSubmit`, `PostToolUse` (all tools), `Stop`, and `SubagentStop`.
+1. Registers the `opensearch-memory` MCP server with Claude Code at **user scope** (`claude mcp add --scope user`), so it's available from every directory — not just where you ran the setup.
+2. Installs **lifecycle hooks** in `~/.claude/settings.json` for `UserPromptSubmit`, `PostToolUse` (all tools), `Stop`, and `SubagentStop`.
 3. Writes recall/analyze guidance to `CLAUDE.md` in the current directory.
-
-Hook failures never block Claude — if OpenSearch is unreachable, the hook logs to stderr and exits 0.
 
 The server auto-creates `~/.opensearch-memory/config.json` with defaults pointing to `http://localhost:9200` (no auth). Edit this file if you need to point to a different cluster.
 
@@ -85,6 +101,28 @@ If `setup claude-code` can't write `~/.claude/settings.json` (permissions, custo
   }
 }
 ```
+
+### Manual Kiro hook wiring
+
+Kiro hooks live in an **agent config**, not a global settings file. To log a
+different agent (or to wire logging by hand), add this `hooks` block to that
+agent's `~/.kiro/agents/<name>.json` (a ready-to-copy example agent is in
+[`config/kiro-agent.json`](config/kiro-agent.json)):
+
+```json
+{
+  "hooks": {
+    "userPromptSubmit": [{ "command": "/abs/path/to/python -m opensearch_memory_mcp hook --agent kiro" }],
+    "postToolUse":      [{ "matcher": "*", "command": "/abs/path/to/python -m opensearch_memory_mcp hook --agent kiro" }],
+    "stop":             [{ "command": "/abs/path/to/python -m opensearch_memory_mcp hook --agent kiro" }]
+  }
+}
+```
+
+Kiro delivers the hook payload as JSON on stdin and exposes the session id via
+the `KIRO_SESSION_ID` environment variable (the `stop` payload also carries the
+assistant's reply inline). The hooks may also point at the convenience wrapper
+[`hooks/kiro-hook.sh`](hooks/kiro-hook.sh).
 
 ## Configuration Reference
 
